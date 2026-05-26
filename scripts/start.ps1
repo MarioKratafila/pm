@@ -2,6 +2,13 @@ $ErrorActionPreference = 'Stop'
 
 Set-Location -Path $PSScriptRoot\..\
 
+Write-Host 'Building frontend...'
+Set-Location -Path .\frontend
+npm install
+npm run build
+
+Set-Location -Path ..\
+
 Write-Host 'Building Docker image...'
 docker build -t pm-app .
 
