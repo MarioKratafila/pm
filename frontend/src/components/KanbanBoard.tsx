@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,9 +15,72 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
+type KanbanBoardProps = {
+  user: string;
+  onLogout: () => void;
+};
+
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000/api"
+    : "/api";
+
+export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchBoard = async () => {
+    const response = await fetch(`${API_BASE}/board?username=${encodeURIComponent(user)}`);
+    if (!response.ok) {
+      throw new Error("Failed to load board");
+    }
+    return (await response.json()) as BoardData;
+  };
+
+  const saveBoard = async (nextBoard: BoardData) => {
+    try {
+      await fetch(`${API_BASE}/board?username=${encodeURIComponent(user)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(nextBoard),
+      });
+    } catch (error) {
+      console.error("Could not save board", error);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    const loadBoard = async () => {
+      try {
+        const boardFromApi = await fetchBoard();
+        if (active) {
+          setBoard(boardFromApi);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadBoard();
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const updateBoard = (nextBoard: BoardData) => {
+    setBoard(nextBoard);
+    void saveBoard(nextBoard);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -39,53 +102,51 @@ export const KanbanBoard = () => {
       return;
     }
 
-    setBoard((prev) => ({
-      ...prev,
-      columns: moveCard(prev.columns, active.id as string, over.id as string),
-    }));
+    updateBoard({
+      ...board,
+      columns: moveCard(board.columns, active.id as string, over.id as string),
+    });
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((column) =>
+    updateBoard({
+      ...board,
+      columns: board.columns.map((column) =>
         column.id === columnId ? { ...column, title } : column
       ),
-    }));
+    });
   };
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
     const id = createId("card");
-    setBoard((prev) => ({
-      ...prev,
+    updateBoard({
+      ...board,
       cards: {
-        ...prev.cards,
+        ...board.cards,
         [id]: { id, title, details: details || "No details yet." },
       },
-      columns: prev.columns.map((column) =>
+      columns: board.columns.map((column) =>
         column.id === columnId
           ? { ...column, cardIds: [...column.cardIds, id] }
           : column
       ),
-    }));
+    });
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
-      return {
-        ...prev,
-        cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      };
+    updateBoard({
+      ...board,
+      cards: Object.fromEntries(
+        Object.entries(board.cards).filter(([id]) => id !== cardId)
+      ),
+      columns: board.columns.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cardIds: column.cardIds.filter((id) => id !== cardId),
+            }
+          : column
+      ),
     });
   };
 
@@ -111,13 +172,22 @@ export const KanbanBoard = () => {
                 and capture quick notes without getting buried in settings.
               </p>
             </div>
-            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                Focus
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                One board. Five columns. Zero clutter.
-              </p>
+            <div className="flex flex-col items-end gap-4">
+              <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                  Focus
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
+                  One board. Five columns. Zero clutter.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold shadow-[var(--shadow)]"
+              >
+                Logout
+              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Management Backend</title>
+  </head>
+  <body style="font-family:system-ui, sans-serif; padding:2rem; background:#f3f4f6; color:#111827;">
+    <main style="max-width:640px; margin:auto; background:white; padding:2rem; border-radius:1rem; box-shadow:0 16px 40px rgba(0,0,0,0.08);">
+      <h1 style="margin-bottom:1rem; font-size:2rem;">Project Management Backend</h1>
+      <p>This backend is ready to serve static content and API routes.</p>
+      <p>Try <a href="/api/health">/api/health</a> for a basic JSON response.</p>
+      <script>
+        fetch('/api/health')
+          .then((response) => response.json())
+          .then((data) => console.log('Health response:', data))
+          .catch((error) => console.error('Health request failed:', error));
+      </script>
+    </main>
+  </body>
+</html>
