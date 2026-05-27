@@ -7,6 +7,7 @@ import { API_BASE, authHeaders } from "@/lib/api";
 type ChatSidebarProps = {
   token: string;
   board: BoardData;
+  boardId: number;
   onUpdateBoard: (board: BoardData) => void;
 };
 
@@ -16,7 +17,7 @@ type ChatMessage = {
   id: string;
 };
 
-export const ChatSidebar = ({ token, board, onUpdateBoard }: ChatSidebarProps) => {
+export const ChatSidebar = ({ token, board, boardId, onUpdateBoard }: ChatSidebarProps) => {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export const ChatSidebar = ({ token, board, onUpdateBoard }: ChatSidebarProps) =
       const response = await fetch(`${API_BASE}/ai`, {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ prompt: trimmed, board }),
+        body: JSON.stringify({ prompt: trimmed, board, board_id: boardId }),
       });
 
       if (!response.ok) {
