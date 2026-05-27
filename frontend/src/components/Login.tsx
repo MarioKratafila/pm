@@ -29,20 +29,22 @@ export const Login = ({ onLogin }: LoginProps) => {
         className="w-full max-w-md rounded-2xl bg-white p-8 shadow-[var(--shadow)]"
       >
         <h2 className="text-2xl font-semibold mb-4">Sign in</h2>
-        <label className="block text-sm font-medium text-[var(--gray-text)]">
+        <label htmlFor="username" className="block text-sm font-medium text-[var(--gray-text)]">
           Username
         </label>
         <input
+          id="username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className="mt-1 w-full rounded-xl border px-3 py-2"
           autoFocus
         />
 
-        <label className="mt-4 block text-sm font-medium text-[var(--gray-text)]">
+        <label htmlFor="password" className="mt-4 block text-sm font-medium text-[var(--gray-text)]">
           Password
         </label>
         <input
+          id="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
