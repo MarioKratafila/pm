@@ -62,7 +62,16 @@ export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) =>
       );
 
       if (!response.ok) {
-        throw new Error("AI request failed");
+        let detail = "AI request failed";
+        try {
+          const errorBody = (await response.json()) as { detail?: string };
+          if (typeof errorBody.detail === "string" && errorBody.detail.trim()) {
+            detail = errorBody.detail;
+          }
+        } catch {
+          // Keep default message when response is not valid JSON.
+        }
+        throw new Error(detail);
       }
 
       const data = await response.json();

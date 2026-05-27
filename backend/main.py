@@ -304,12 +304,18 @@ async def proxy_ai(
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            "https://api.openrouter.ai/v1/chat/completions",
-            json=payload,
-            headers=headers,
-        )
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=payload,
+                headers=headers,
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenRouter request failed: {exc.__class__.__name__}",
+        ) from exc
 
     if response.status_code != 200:
         raise HTTPException(status_code=502, detail="Failed to call OpenRouter")
@@ -321,6 +327,8 @@ async def proxy_ai(
     )
     parsed = parse_structured_ai_response(ai_message)
     response_text = ai_message.strip()
+    if parsed is not None and isinstance(parsed.get("response"), str):
+        response_text = parsed["response"].strip()
     output: dict[str, Any] = {
         "status": "ok",
         "response": response_text,
