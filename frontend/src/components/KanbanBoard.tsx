@@ -232,7 +232,7 @@ export const KanbanBoard = ({ user, token, onLogout }: KanbanBoardProps) => {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
-              <section className="grid gap-6 lg:grid-cols-5">
+              <section className="grid grid-cols-[repeat(5,minmax(190px,1fr))] gap-4 overflow-x-auto pb-2">
                 {board.columns.map((column) => (
                   <KanbanColumn
                     key={column.id}
@@ -246,7 +246,7 @@ export const KanbanBoard = ({ user, token, onLogout }: KanbanBoardProps) => {
               </section>
               <DragOverlay>
                 {activeCard ? (
-                  <div className="w-[260px]">
+                  <div className="w-[200px]">
                     <KanbanCardPreview card={activeCard} />
                   </div>
                 ) : null}

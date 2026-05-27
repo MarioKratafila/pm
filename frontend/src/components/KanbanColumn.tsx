@@ -42,12 +42,12 @@ export const KanbanColumn = ({
           <input
             value={column.title}
             onChange={(event) => onRename(column.id, event.target.value)}
-            className="mt-3 w-full bg-transparent font-display text-lg font-semibold text-[var(--navy-dark)] outline-none"
+            className="mt-2 w-full bg-transparent font-display text-base font-semibold text-[var(--navy-dark)] outline-none"
             aria-label="Column title"
           />
         </div>
       </div>
-      <div className="mt-4 flex flex-1 flex-col gap-3">
+      <div className="mt-3 flex flex-1 flex-col gap-2">
         <SortableContext items={column.cardIds} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <KanbanCard

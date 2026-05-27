@@ -22,7 +22,7 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       ref={setNodeRef}
       style={style}
       className={clsx(
-        "rounded-2xl border border-transparent bg-white px-4 py-4 shadow-[0_12px_24px_rgba(3,33,71,0.08)]",
+        "group relative rounded-2xl border border-transparent bg-white px-3 py-3 shadow-[0_12px_24px_rgba(3,33,71,0.08)]",
         "transition-all duration-150",
         isDragging && "opacity-60 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
       )}
@@ -30,23 +30,24 @@ export const KanbanCard = ({ card, onDelete }: KanbanCardProps) => {
       {...listeners}
       data-testid={`card-${card.id}`}
     >
-      <div className="min-w-0">
-        <h4 className="font-display text-base font-semibold text-[var(--navy-dark)]">
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onDelete(card.id)}
+        className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full text-[var(--gray-text)] opacity-0 transition-opacity hover:bg-red-50 hover:text-red-400 group-hover:opacity-100"
+        aria-label={`Delete ${card.title}`}
+      >
+        <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+          <path d="M1 1l7 7M8 1l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
+      <div className="min-w-0 pr-4">
+        <h4 className="font-display text-sm font-semibold text-[var(--navy-dark)]">
           {card.title}
         </h4>
-        <p className="mt-2 break-words text-sm leading-6 text-[var(--gray-text)]">
+        <p className="mt-1.5 break-words text-xs leading-5 text-[var(--gray-text)]">
           {card.details}
         </p>
-      </div>
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => onDelete(card.id)}
-          className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
-          aria-label={`Delete ${card.title}`}
-        >
-          Remove
-        </button>
       </div>
     </article>
   );
