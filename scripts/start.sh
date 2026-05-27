@@ -2,6 +2,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo "Building frontend..."
+cd frontend
+npm install
+npm run build
+cd ..
+
 echo "Building Docker image..."
 docker build -t pm-app .
 

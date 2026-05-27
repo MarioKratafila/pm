@@ -1,14 +1,15 @@
 import contextlib
 import json
 import os
+import secrets
 import sqlite3
-from datetime import datetime
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,11 +21,20 @@ NEXT_STATIC_DIR = STATIC_DIR / "_next"
 DB_PATH = Path(os.getenv("DATABASE_PATH", BASE_DIR / "pm.db"))
 load_dotenv(BASE_DIR.parent / ".env")
 
-app = FastAPI(title="Project Management Backend")
+_sessions: dict[str, str] = {}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Project Management Backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["GET", "PUT", "POST", "OPTIONS"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["GET", "PUT", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 if NEXT_STATIC_DIR.exists():
@@ -100,6 +110,11 @@ class BoardData(BaseModel):
     cards: dict[str, Card]
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 def get_db_connection() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -131,11 +146,6 @@ def init_db() -> None:
             """
         )
         connection.commit()
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    init_db()
 
 
 def get_index_file() -> Path:
@@ -189,6 +199,16 @@ def save_board_for_user(connection: sqlite3.Connection, user_id: int, board: dic
     connection.commit()
 
 
+def get_current_user(authorization: str | None = Header(None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization[7:]
+    username = _sessions.get(token)
+    if not username:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    return username
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -199,8 +219,25 @@ async def hello() -> dict[str, str]:
     return {"message": "hello world"}
 
 
+@app.post("/api/login")
+async def login(request: LoginRequest) -> dict[str, str]:
+    if request.username != "user" or request.password != "password":
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = secrets.token_hex(32)
+    _sessions[token] = request.username
+    return {"token": token, "username": request.username}
+
+
+@app.post("/api/logout")
+async def logout(username: str = Depends(get_current_user), authorization: str | None = Header(None)) -> dict[str, str]:
+    if authorization:
+        token = authorization[7:]
+        _sessions.pop(token, None)
+    return {"status": "ok"}
+
+
 @app.get("/api/board", response_model=BoardData)
-async def read_board(username: str = Query(..., min_length=1)) -> dict[str, Any]:
+async def read_board(username: str = Depends(get_current_user)) -> dict[str, Any]:
     with contextlib.closing(get_db_connection()) as connection:
         user_id = get_or_create_user_id(connection, username)
         return get_board_for_user(connection, user_id)
@@ -255,7 +292,7 @@ def parse_structured_ai_response(content: str) -> dict[str, Any] | None:
 @app.post("/api/ai")
 async def proxy_ai(
     request: AIRequest,
-    username: str | None = Query(None, min_length=1),
+    username: str = Depends(get_current_user),
 ) -> dict[str, Any]:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
@@ -342,10 +379,9 @@ async def proxy_ai(
             try:
                 updated_board = BoardData.model_validate(board_payload)
                 output["updatedBoard"] = updated_board.model_dump()
-                if username:
-                    with contextlib.closing(get_db_connection()) as connection:
-                        user_id = get_or_create_user_id(connection, username)
-                        save_board_for_user(connection, user_id, updated_board.model_dump())
+                with contextlib.closing(get_db_connection()) as connection:
+                    user_id = get_or_create_user_id(connection, username)
+                    save_board_for_user(connection, user_id, updated_board.model_dump())
             except Exception:
                 output["boardValidationError"] = True
 
@@ -355,7 +391,7 @@ async def proxy_ai(
 @app.put("/api/board")
 async def update_board(
     board: BoardData,
-    username: str = Query(..., min_length=1),
+    username: str = Depends(get_current_user),
 ) -> dict[str, str]:
     with contextlib.closing(get_db_connection()) as connection:
         user_id = get_or_create_user_id(connection, username)

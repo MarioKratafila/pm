@@ -4,8 +4,6 @@ import { vi } from "vitest";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { initialData } from "@/lib/kanban";
 
-const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
-
 const mockFetch = vi.fn();
 
 describe("KanbanBoard", () => {
@@ -17,16 +15,15 @@ describe("KanbanBoard", () => {
         url.startsWith("/api/board") ||
         url.startsWith("http://localhost:8000/api/board")
       ) {
-        if (!init || (init as RequestInit).method === undefined) {
+        if (init && (init as RequestInit).method === "PUT") {
           return Promise.resolve({
             ok: true,
-            json: () => Promise.resolve(initialData),
+            json: () => Promise.resolve({ status: "ok" }),
           } as Response);
         }
-
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ status: "ok" }),
+          json: () => Promise.resolve(initialData),
         } as Response);
       }
       return Promise.reject(new Error("Unexpected fetch request"));
@@ -40,12 +37,12 @@ describe("KanbanBoard", () => {
   });
 
   it("renders five columns", async () => {
-    render(<KanbanBoard user="user" onLogout={() => {}} />);
+    render(<KanbanBoard user="user" token="test-token" onLogout={() => {}} />);
     expect(await screen.findAllByTestId(/column-/i)).toHaveLength(5);
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard user="user" onLogout={() => {}} />);
+    render(<KanbanBoard user="user" token="test-token" onLogout={() => {}} />);
     const column = await screen.findAllByTestId(/column-/i).then((columns) => columns[0]);
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
@@ -54,7 +51,7 @@ describe("KanbanBoard", () => {
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard user="user" onLogout={() => {}} />);
+    render(<KanbanBoard user="user" token="test-token" onLogout={() => {}} />);
     const column = await screen.findAllByTestId(/column-/i).then((columns) => columns[0]);
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,

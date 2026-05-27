@@ -1,24 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { API_BASE } from "@/lib/api";
 
 type LoginProps = {
-  onLogin: (username: string) => void;
+  onLogin: (username: string, token: string) => void;
 };
 
 export const Login = ({ onLogin }: LoginProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Hardcoded credentials for MVP
-    if (username === "user" && password === "password") {
-      onLogin(username);
-      setError(null);
-    } else {
-      setError("Invalid credentials");
+    setError(null);
+    setSubmitting(true);
+    try {
+      const response = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!response.ok) {
+        setError("Invalid credentials");
+        return;
+      }
+      const data = (await response.json()) as { username: string; token: string };
+      onLogin(data.username, data.token);
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -56,9 +70,10 @@ export const Login = ({ onLogin }: LoginProps) => {
         <div className="mt-6 flex items-center justify-between">
           <button
             type="submit"
-            className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+            disabled={submitting}
+            className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white disabled:opacity-60"
           >
-            Sign in
+            {submitting ? "Signing in..." : "Sign in"}
           </button>
           <div className="text-sm text-[var(--gray-text)]">user / password</div>
         </div>

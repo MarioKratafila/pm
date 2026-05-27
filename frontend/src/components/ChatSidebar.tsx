@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import type { BoardData } from "@/lib/kanban";
+import { API_BASE, authHeaders } from "@/lib/api";
 
 type ChatSidebarProps = {
-  user: string;
+  token: string;
   board: BoardData;
   onUpdateBoard: (board: BoardData) => void;
 };
@@ -15,12 +16,7 @@ type ChatMessage = {
   id: string;
 };
 
-const API_BASE =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:8000/api"
-    : "/api";
-
-export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) => {
+export const ChatSidebar = ({ token, board, onUpdateBoard }: ChatSidebarProps) => {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -42,7 +38,7 @@ export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) =>
     setSending(true);
 
     const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: crypto.randomUUID(),
       role: "user",
       text: trimmed,
     };
@@ -50,16 +46,11 @@ export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) =>
     setPrompt("");
 
     try {
-      const response = await fetch(
-        `${API_BASE}/ai?username=${encodeURIComponent(user)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ prompt: trimmed, board }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/ai`, {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify({ prompt: trimmed, board }),
+      });
 
       if (!response.ok) {
         let detail = "AI request failed";
@@ -81,12 +72,14 @@ export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) =>
           : JSON.stringify(data.raw ?? data, null, 2);
 
       addMessage({
-        id: `assistant-${Date.now()}`,
+        id: crypto.randomUUID(),
         role: "assistant",
         text: assistantText,
       });
 
-      if (data.updatedBoard) {
+      if (data.boardValidationError) {
+        setStatus("AI attempted a board update but the response format was invalid.");
+      } else if (data.updatedBoard) {
         onUpdateBoard(data.updatedBoard as BoardData);
         setStatus("AI suggested updates applied to the board.");
       } else {
@@ -116,10 +109,11 @@ export const ChatSidebar = ({ user, board, onUpdateBoard }: ChatSidebarProps) =>
       </div>
 
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-[var(--gray-text)]">
+        <label htmlFor="ai-prompt" className="block text-sm font-medium text-[var(--gray-text)]">
           Your prompt
         </label>
         <textarea
+          id="ai-prompt"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           rows={4}
