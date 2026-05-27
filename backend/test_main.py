@@ -1,7 +1,8 @@
+import json
 import pathlib
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -42,7 +43,29 @@ class BackendBoardApiTest(unittest.TestCase):
         self.assertEqual(refreshed_data["columns"][0]["title"], updated_title)
 
     def test_ai_proxy_route(self):
-        mock_body = {"choices": [{"message": {"content": "4"}}]}
+        username = "user"
+        response = self.client.get("/api/board", params={"username": username})
+        self.assertEqual(response.status_code, 200)
+        board_data = response.json()
+
+        updated_title = "Backlog Updated"
+        updated_board = board_data.copy()
+        updated_board["columns"][0]["title"] = updated_title
+
+        mock_body = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "response": "Board updated",
+                                "updatedBoard": updated_board,
+                            }
+                        )
+                    }
+                }
+            ]
+        }
 
         class FakeResponse:
             status_code = 200
@@ -61,11 +84,19 @@ class BackendBoardApiTest(unittest.TestCase):
                 return FakeResponse()
 
         with patch("main.httpx.AsyncClient", return_value=FakeClient()):
-            response = self.client.post("/api/ai", json={"prompt": "2+2"})
+            response = self.client.post(
+                "/api/ai",
+                params={"username": username},
+                json={"prompt": "Rename the first column to Backlog Updated", "board": board_data},
+            )
             self.assertEqual(response.status_code, 200)
             data = response.json()
             self.assertEqual(data["status"], "ok")
-            self.assertEqual(data["result"], mock_body)
+            self.assertEqual(data["structured"]["updatedBoard"]["columns"][0]["title"], updated_title)
+            self.assertEqual(data["updatedBoard"]["columns"][0]["title"], updated_title)
+
+            refreshed = self.client.get("/api/board", params={"username": username}).json()
+            self.assertEqual(refreshed["columns"][0]["title"], updated_title)
 
     @classmethod
     def tearDownClass(cls):

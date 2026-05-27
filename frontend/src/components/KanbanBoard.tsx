@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { ChatSidebar } from "@/components/ChatSidebar";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
 type KanbanBoardProps = {
@@ -203,32 +204,38 @@ export const KanbanBoard = ({ user, onLogout }: KanbanBoardProps) => {
           </div>
         </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+          <div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <section className="grid gap-6 lg:grid-cols-5">
+                {board.columns.map((column) => (
+                  <KanbanColumn
+                    key={column.id}
+                    column={column}
+                    cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                    onRename={handleRenameColumn}
+                    onAddCard={handleAddCard}
+                    onDeleteCard={handleDeleteCard}
+                  />
+                ))}
+              </section>
+              <DragOverlay>
+                {activeCard ? (
+                  <div className="w-[260px]">
+                    <KanbanCardPreview card={activeCard} />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
+
+          <ChatSidebar user={user} board={board} onUpdateBoard={updateBoard} />
+        </div>
       </main>
     </div>
   );

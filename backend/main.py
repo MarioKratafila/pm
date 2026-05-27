@@ -208,17 +208,96 @@ async def read_board(username: str = Query(..., min_length=1)) -> dict[str, Any]
 
 class AIRequest(BaseModel):
     prompt: str
+    board: BoardData | None = None
+
+
+def extract_json_object(content: str) -> str | None:
+    start = content.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for index in range(start, len(content)):
+        char = content[index]
+        if escape:
+            escape = False
+            continue
+        if char == "\\":
+            escape = True
+            continue
+        if char == "\"":
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return content[start : index + 1]
+    return None
+
+
+def parse_structured_ai_response(content: str) -> dict[str, Any] | None:
+    json_text = extract_json_object(content)
+    if not json_text:
+        return None
+    try:
+        return json.loads(json_text)
+    except json.JSONDecodeError:
+        return None
 
 
 @app.post("/api/ai")
-async def proxy_ai(request: AIRequest) -> dict[str, Any]:
+async def proxy_ai(
+    request: AIRequest,
+    username: str | None = Query(None, min_length=1),
+) -> dict[str, Any]:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
 
+    system_message = (
+        "You are an AI assistant for a Kanban board app. "
+        "The user may ask you to update board state, add cards, or summarize the board. "
+        "Always return a JSON object in your final answer with the keys `response` and optionally `updatedBoard`. "
+        "If you include `updatedBoard`, it must match the board schema exactly. "
+        "If no board changes are needed, omit `updatedBoard`."
+    )
+
+    messages = [
+        {"role": "system", "content": system_message},
+    ]
+
+    if request.board is not None:
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Here is the current board state in JSON. Use it as context for any updates:\n"
+                    + json.dumps(request.board.model_dump(), indent=2)
+                ),
+            }
+        )
+
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                "Answer the user prompt below. "
+                "Return only JSON with the keys `response` and optionally `updatedBoard`.\n\n"
+                f"User prompt: {request.prompt}"
+            ),
+        }
+    )
+
     payload = {
         "model": "openai/gpt-oss-120b:free",
-        "messages": [{"role": "user", "content": request.prompt}],
+        "messages": messages,
     }
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -235,7 +314,34 @@ async def proxy_ai(request: AIRequest) -> dict[str, Any]:
     if response.status_code != 200:
         raise HTTPException(status_code=502, detail="Failed to call OpenRouter")
 
-    return {"status": "ok", "result": response.json()}
+    result_json = response.json()
+    ai_message = (
+        result_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+        or ""
+    )
+    parsed = parse_structured_ai_response(ai_message)
+    response_text = ai_message.strip()
+    output: dict[str, Any] = {
+        "status": "ok",
+        "response": response_text,
+        "raw": result_json,
+    }
+
+    if parsed is not None:
+        output["structured"] = parsed
+        board_payload = parsed.get("updatedBoard") or parsed.get("updated_board")
+        if board_payload is not None:
+            try:
+                updated_board = BoardData.model_validate(board_payload)
+                output["updatedBoard"] = updated_board.model_dump()
+                if username:
+                    with contextlib.closing(get_db_connection()) as connection:
+                        user_id = get_or_create_user_id(connection, username)
+                        save_board_for_user(connection, user_id, updated_board.model_dump())
+            except Exception:
+                output["boardValidationError"] = True
+
+    return output
 
 
 @app.put("/api/board")

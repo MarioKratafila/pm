@@ -5,7 +5,7 @@ __pycache__/
 *.db
 .venv/
 venv/
-.env
+#.env
 .git/
 node_modules/
 frontend/node_modules/
