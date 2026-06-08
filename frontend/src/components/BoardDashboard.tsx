@@ -26,18 +26,14 @@ export const BoardDashboard = ({ user, token, onSelectBoard, onLogout }: BoardDa
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const fetchBoards = async () => {
+  const fetchBoards = async (): Promise<BoardMeta[]> => {
     const response = await fetch(`${API_BASE}/boards`, { headers: authHeaders(token) });
     if (!response.ok) throw new Error("Failed to load boards");
     return (await response.json()) as BoardMeta[];
   };
 
   useEffect(() => {
-    fetch(`${API_BASE}/boards`, { headers: authHeaders(token) })
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed to load boards");
-        return r.json() as Promise<BoardMeta[]>;
-      })
+    fetchBoards()
       .then(setBoards)
       .catch(() => setError("Failed to load boards"))
       .finally(() => setLoading(false));
@@ -62,8 +58,7 @@ export const BoardDashboard = ({ user, token, onSelectBoard, onLogout }: BoardDa
         return;
       }
       setNewBoardName("");
-      const updated = await fetchBoards();
-      setBoards(updated);
+      setBoards(await fetchBoards());
     } catch {
       setError("Failed to create board");
     } finally {
@@ -100,20 +95,15 @@ export const BoardDashboard = ({ user, token, onSelectBoard, onLogout }: BoardDa
       setRenamingId(null);
       return;
     }
-    try {
-      const response = await fetch(`${API_BASE}/boards/${boardId}`, {
-        method: "PATCH",
-        headers: authHeaders(token),
-        body: JSON.stringify({ name }),
-      });
-      if (response.ok) {
-        setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, name } : b)));
-      }
-    } catch {
-      // ignore rename errors silently
-    } finally {
-      setRenamingId(null);
+    const response = await fetch(`${API_BASE}/boards/${boardId}`, {
+      method: "PATCH",
+      headers: authHeaders(token),
+      body: JSON.stringify({ name }),
+    });
+    if (response.ok) {
+      setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, name } : b)));
     }
+    setRenamingId(null);
   };
 
   if (loading) {

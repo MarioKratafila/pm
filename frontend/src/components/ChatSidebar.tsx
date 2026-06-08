@@ -24,26 +24,18 @@ export const ChatSidebar = ({ token, board, boardId, onUpdateBoard }: ChatSideba
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const addMessage = (message: ChatMessage) => {
-    setMessages((prev) => [...prev, message]);
-  };
-
   const handleSend = async () => {
     const trimmed = prompt.trim();
-    if (!trimmed) {
-      return;
-    }
+    if (!trimmed) return;
 
     setError(null);
     setStatus(null);
     setSending(true);
 
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      text: trimmed,
-    };
-    addMessage(userMessage);
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: "user", text: trimmed },
+    ]);
     setPrompt("");
 
     try {
@@ -54,16 +46,8 @@ export const ChatSidebar = ({ token, board, boardId, onUpdateBoard }: ChatSideba
       });
 
       if (!response.ok) {
-        let detail = "AI request failed";
-        try {
-          const errorBody = (await response.json()) as { detail?: string };
-          if (typeof errorBody.detail === "string" && errorBody.detail.trim()) {
-            detail = errorBody.detail;
-          }
-        } catch {
-          // Keep default message when response is not valid JSON.
-        }
-        throw new Error(detail);
+        const body = (await response.json().catch(() => ({}))) as { detail?: string };
+        throw new Error(body.detail?.trim() || "AI request failed");
       }
 
       const data = await response.json();
@@ -72,11 +56,10 @@ export const ChatSidebar = ({ token, board, boardId, onUpdateBoard }: ChatSideba
           ? data.response
           : JSON.stringify(data.raw ?? data, null, 2);
 
-      addMessage({
-        id: crypto.randomUUID(),
-        role: "assistant",
-        text: assistantText,
-      });
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: "assistant", text: assistantText },
+      ]);
 
       if (data.boardValidationError) {
         setStatus("AI attempted a board update but the response format was invalid.");
@@ -87,9 +70,7 @@ export const ChatSidebar = ({ token, board, boardId, onUpdateBoard }: ChatSideba
         setStatus("AI response received. No board changes were detected.");
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to reach the AI service."
-      );
+      setError(err instanceof Error ? err.message : "Unable to reach the AI service.");
     } finally {
       setSending(false);
     }

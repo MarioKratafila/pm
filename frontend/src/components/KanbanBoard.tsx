@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -40,40 +40,26 @@ export const KanbanBoard = ({
   const [saveError, setSaveError] = useState(false);
   const loading = loadedBoardId !== boardId;
 
-  const fetchBoard = async () => {
-    const response = await fetch(`${API_BASE}/boards/${boardId}`, {
-      headers: authHeaders(token),
-    });
-    if (response.status === 401) {
-      onLogout();
-      return null;
-    }
-    if (!response.ok) throw new Error("Failed to load board");
-    return (await response.json()) as BoardData;
-  };
-
-  const saveBoard = async (nextBoard: BoardData) => {
-    try {
-      const response = await fetch(`${API_BASE}/boards/${boardId}`, {
-        method: "PUT",
-        headers: authHeaders(token),
-        body: JSON.stringify(nextBoard),
-      });
-      setSaveError(!response.ok);
-    } catch {
-      setSaveError(true);
-    }
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   useEffect(() => {
     let active = true;
 
-    fetchBoard()
-      .then((data) => {
-        if (active && data) {
-          setBoard(data);
-          setLoadedBoardId(boardId);
+    fetch(`${API_BASE}/boards/${boardId}`, { headers: authHeaders(token) })
+      .then((response) => {
+        if (response.status === 401) {
+          onLogout();
+          return null;
         }
+        if (!response.ok) throw new Error("Failed to load board");
+        return response.json() as Promise<BoardData>;
+      })
+      .then((data) => {
+        if (!active) return;
+        if (data) setBoard(data);
+        setLoadedBoardId(boardId);
       })
       .catch((err) => {
         console.error(err);
@@ -88,14 +74,14 @@ export const KanbanBoard = ({
 
   const updateBoard = (nextBoard: BoardData) => {
     setBoard(nextBoard);
-    void saveBoard(nextBoard);
+    fetch(`${API_BASE}/boards/${boardId}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(nextBoard),
+    })
+      .then((response) => setSaveError(!response.ok))
+      .catch(() => setSaveError(true));
   };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
-
-  const cardsById = useMemo(() => board.cards, [board.cards]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -121,10 +107,12 @@ export const KanbanBoard = ({
   };
 
   const handleAddColumn = () => {
-    const id = createId("col");
     updateBoard({
       ...board,
-      columns: [...board.columns, { id, title: "New Column", cardIds: [] }],
+      columns: [
+        ...board.columns,
+        { id: createId("col"), title: "New Column", cardIds: [] },
+      ],
     });
   };
 
@@ -179,7 +167,7 @@ export const KanbanBoard = ({
     });
   };
 
-  const activeCard = activeCardId ? cardsById[activeCardId] : null;
+  const activeCard = activeCardId ? board.cards[activeCardId] : null;
 
   if (loading) {
     return (
@@ -220,23 +208,21 @@ export const KanbanBoard = ({
                 Signed in as <span className="font-semibold text-[var(--navy-dark)]">{user}</span>
               </p>
             </div>
-            <div className="flex flex-col items-end gap-4">
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleAddColumn}
-                  className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold shadow-[var(--shadow)] hover:bg-[var(--surface)] transition"
-                >
-                  Add column
-                </button>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold shadow-[var(--shadow)]"
-                >
-                  Logout
-                </button>
-              </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleAddColumn}
+                className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold shadow-[var(--shadow)] hover:bg-[var(--surface)] transition"
+              >
+                Add column
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-sm font-semibold shadow-[var(--shadow)]"
+              >
+                Logout
+              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">

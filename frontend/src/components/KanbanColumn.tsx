@@ -72,7 +72,7 @@ export const KanbanColumn = ({
             <KanbanCard
               key={card.id}
               card={card}
-              onEdit={(cardId, title, details) => onEditCard(cardId, title, details)}
+              onEdit={onEditCard}
               onDelete={(cardId) => onDeleteCard(column.id, cardId)}
             />
           ))}
@@ -83,9 +83,7 @@ export const KanbanColumn = ({
           </div>
         )}
       </div>
-      <NewCardForm
-        onAdd={(title, details) => onAddCard(column.id, title, details)}
-      />
+      <NewCardForm onAdd={(title, details) => onAddCard(column.id, title, details)} />
     </section>
   );
 };

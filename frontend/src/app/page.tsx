@@ -9,22 +9,20 @@ import { API_BASE } from "@/lib/api";
 type Session = { user: string; token: string };
 type SelectedBoard = { id: number; name: string };
 
+function loadSession(): Session | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem("pm_session");
+  return stored ? (JSON.parse(stored) as Session) : null;
+}
+
 export default function Home() {
-  const [session, setSession] = useState<Session | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const stored = localStorage.getItem("pm_session");
-      return stored ? (JSON.parse(stored) as Session) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [session, setSession] = useState<Session | null>(loadSession);
   const [selectedBoard, setSelectedBoard] = useState<SelectedBoard | null>(null);
 
   const handleLogin = (user: string, token: string) => {
-    const s: Session = { user, token };
-    localStorage.setItem("pm_session", JSON.stringify(s));
-    setSession(s);
+    const next: Session = { user, token };
+    localStorage.setItem("pm_session", JSON.stringify(next));
+    setSession(next);
     setSelectedBoard(null);
   };
 
@@ -49,7 +47,7 @@ export default function Home() {
       <BoardDashboard
         user={session.user}
         token={session.token}
-        onSelectBoard={(boardId, boardName) => setSelectedBoard({ id: boardId, name: boardName })}
+        onSelectBoard={(id, name) => setSelectedBoard({ id, name })}
         onLogout={handleLogout}
       />
     );

@@ -19,11 +19,7 @@ export const initialData: BoardData = {
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
     { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
-    {
-      id: "col-progress",
-      title: "In Progress",
-      cardIds: ["card-4", "card-5"],
-    },
+    { id: "col-progress", title: "In Progress", cardIds: ["card-4", "card-5"] },
     { id: "col-review", title: "Review", cardIds: ["card-6"] },
     { id: "col-done", title: "Done", cardIds: ["card-7", "card-8"] },
   ],
@@ -71,98 +67,45 @@ export const initialData: BoardData = {
   },
 };
 
-const isColumnId = (columns: Column[], id: string) =>
-  columns.some((column) => column.id === id);
+function findColumnId(columns: Column[], id: string): string | undefined {
+  if (columns.some((col) => col.id === id)) return id;
+  return columns.find((col) => col.cardIds.includes(id))?.id;
+}
 
-const findColumnId = (columns: Column[], id: string) => {
-  if (isColumnId(columns, id)) {
-    return id;
-  }
-  return columns.find((column) => column.cardIds.includes(id))?.id;
-};
-
-export const moveCard = (
+export function moveCard(
   columns: Column[],
   activeId: string,
   overId: string
-): Column[] => {
+): Column[] {
   const activeColumnId = findColumnId(columns, activeId);
   const overColumnId = findColumnId(columns, overId);
+  if (!activeColumnId || !overColumnId) return columns;
 
-  if (!activeColumnId || !overColumnId) {
-    return columns;
-  }
-
-  const activeColumn = columns.find((column) => column.id === activeColumnId);
-  const overColumn = columns.find((column) => column.id === overColumnId);
-
-  if (!activeColumn || !overColumn) {
-    return columns;
-  }
-
-  const isOverColumn = isColumnId(columns, overId);
-
-  if (activeColumnId === overColumnId) {
-    if (isOverColumn) {
-      const nextCardIds = activeColumn.cardIds.filter(
-        (cardId) => cardId !== activeId
-      );
-      nextCardIds.push(activeId);
-      return columns.map((column) =>
-        column.id === activeColumnId
-          ? { ...column, cardIds: nextCardIds }
-          : column
-      );
-    }
-
-    const oldIndex = activeColumn.cardIds.indexOf(activeId);
-    const newIndex = activeColumn.cardIds.indexOf(overId);
-
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-      return columns;
-    }
-
-    const nextCardIds = [...activeColumn.cardIds];
-    nextCardIds.splice(oldIndex, 1);
-    nextCardIds.splice(newIndex, 0, activeId);
-
-    return columns.map((column) =>
-      column.id === activeColumnId
-        ? { ...column, cardIds: nextCardIds }
-        : column
-    );
-  }
-
-  const activeIndex = activeColumn.cardIds.indexOf(activeId);
-  if (activeIndex === -1) {
-    return columns;
-  }
-
-  const nextActiveCardIds = [...activeColumn.cardIds];
-  nextActiveCardIds.splice(activeIndex, 1);
-
-  const nextOverCardIds = [...overColumn.cardIds];
-  if (isOverColumn) {
-    nextOverCardIds.push(activeId);
-  } else {
-    const overIndex = overColumn.cardIds.indexOf(overId);
-    const insertIndex = overIndex === -1 ? nextOverCardIds.length : overIndex;
-    nextOverCardIds.splice(insertIndex, 0, activeId);
-  }
+  const overIsColumn = columns.some((col) => col.id === overId);
 
   return columns.map((column) => {
-    if (column.id === activeColumnId) {
-      return { ...column, cardIds: nextActiveCardIds };
+    if (column.id !== activeColumnId && column.id !== overColumnId) {
+      return column;
     }
-    if (column.id === overColumnId) {
-      return { ...column, cardIds: nextOverCardIds };
-    }
-    return column;
-  });
-};
 
-export const createId = (prefix: string) => {
+    let cardIds = column.cardIds.filter((id) => id !== activeId);
+
+    if (column.id === overColumnId) {
+      const overIndex = overIsColumn ? cardIds.length : cardIds.indexOf(overId);
+      const insertIndex = overIndex === -1 ? cardIds.length : overIndex;
+      cardIds = [
+        ...cardIds.slice(0, insertIndex),
+        activeId,
+        ...cardIds.slice(insertIndex),
+      ];
+    }
+
+    return { ...column, cardIds };
+  });
+}
+
+export function createId(prefix: string): string {
   const randomPart = Math.random().toString(36).slice(2, 8);
   const timePart = Date.now().toString(36);
   return `${prefix}-${randomPart}${timePart}`;
-};
+}
